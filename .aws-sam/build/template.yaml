@@ -1,0 +1,298 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: lambda-provisioned-concurrency-deep-dive
+Transform:
+- AWS::Serverless-2016-10-31
+Parameters:
+  Alias:
+    Description: AutoPublishAlias name
+    Type: String
+    Default: live
+Resources:
+  ProvisionedConcurrencyNone:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: A Lambda function that logs the payload of messages sent to an
+        associated SQS queue.
+      Runtime: nodejs12.x
+      Handler: src/handlers/provisioned-concurrency-none.scheduledEventLoggerHandler
+      Events:
+        CloudWatchEvent:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 * * * ? *)
+      MemorySize: 128
+      Timeout: 500
+      CodeUri: ProvisionedConcurrencyNone
+  PCNoneDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName:
+        Fn::Sub: PCNone-${AWS::StackName}
+      DashboardBody:
+        Fn::Sub: '{ "widgets": [ { "height": 6, "width": 9, "y": 0, "x": 15, "type":
+          "metric", "properties": { "period": 1, "metrics": [ [ "AWS/Lambda", "Duration",
+          "FunctionName", "${ProvisionedConcurrencyNone}", "Resource", "${ProvisionedConcurrencyNone}:${Alias}",
+          { "stat": "Minimum" } ], [ "...", { "stat": "Average" } ], [ "...", { "stat":
+          "Maximum" } ] ], "region": "eu-west-1", "view": "timeSeries", "stacked":
+          false, "title": "Execution Duration", "liveData": true } }, { "height":
+          9, "width": 12, "y": 6, "x": 12, "type": "metric", "properties": { "metrics":
+          [ [ "AWS/Lambda", "ConcurrentExecutions", "FunctionName", "${ProvisionedConcurrencyNone}",
+          "Resource", "${ProvisionedConcurrencyNone}:${Alias}", { "label": "ConcurrentExecutions"
+          } ], [ ".", "ProvisionedConcurrentExecutions", ".", "." ], [ ".", "ProvisionedConcurrencySpilloverInvocations",
+          ".", "." ] ], "period": 1, "region": "eu-west-1", "title": "Concurrent executions",
+          "view": "timeSeries", "stacked": false, "liveData": true, "stat": "Maximum"
+          } }, { "height": 9, "width": 12, "y": 6, "x": 0, "type": "metric", "properties":
+          { "period": 1, "metrics": [ [ "AWS/Lambda", "ProvisionedConcurrencyUtilization",
+          "FunctionName", "${ProvisionedConcurrencyNone}", "Resource", "${ProvisionedConcurrencyNone}:${Alias}",
+          { "stat": "Maximum" } ] ], "region": "eu-west-1", "yAxis": { "left": { "max":
+          1 } }, "view": "timeSeries", "stacked": false, "title": "ProvisionedConcurrencyUtilization",
+          "liveData": true } }, { "height": 3, "width": 15, "y": 0, "x": 0, "type":
+          "metric", "properties": { "metrics": [ [ "WhatsNew-LambdaPC", "Latency",
+          "CATEGORY", "performance", "TEST_NAME", "${ProvisionedConcurrencyNone}",
+          "TYPE", "latency", { "label": "Latency - Max", "stat": "Maximum" } ], [
+          "...", { "label": "Latency - P99", "stat": "p99" } ], [ "...", { "label":
+          "Latency - Avg" } ], [ "...", { "label": "Samples", "stat": "SampleCount"
+          } ] ], "view": "singleValue", "stacked": true, "region": "eu-west-1", "start":
+          "-PT1H", "end": "P0D", "stat": "Average", "period": 1, "setPeriodToTimeRange":
+          true, "title": "Artillery Data" } }, { "height": 3, "width": 15, "y": 3,
+          "x": 0, "type": "metric", "properties": { "metrics": [ [ "AWS/Lambda", "ProvisionedConcurrentExecutions",
+          "FunctionName", "${ProvisionedConcurrencyNone}" ], [ ".", "ProvisionedConcurrencySpilloverInvocations",
+          ".", "." ], [ ".", "ProvisionedConcurrencyInvocations", ".", ".", { "visible":
+          false, "stat": "Sum" } ] ], "view": "singleValue", "region": "eu-west-1",
+          "stat": "Maximum", "period": 5, "title": "PC Utilization" } } ]}
+
+          '
+  ProvisionedConcurrencyAllTime:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: A Lambda function that logs the payload of messages sent to an
+        associated SQS queue.
+      Runtime: nodejs12.x
+      Handler: src/handlers/provisioned-concurrency-all-time.scheduledEventLoggerHandler
+      AutoPublishAlias: live
+      DeploymentPreference:
+        Type: AllAtOnce
+      ProvisionedConcurrencyConfig:
+        ProvisionedConcurrentExecutions: 5
+      Events:
+        CloudWatchEvent:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 * * * ? *)
+      MemorySize: 128
+      Timeout: 500
+      CodeUri: ProvisionedConcurrencyAllTime
+  PCAllTimesDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName:
+        Fn::Sub: PCAllTimes-${AWS::StackName}
+      DashboardBody:
+        Fn::Sub: '{ "widgets": [ { "height": 6, "width": 9, "y": 0, "x": 15, "type":
+          "metric", "properties": { "period": 1, "metrics": [ [ "AWS/Lambda", "Duration",
+          "FunctionName", "${ProvisionedConcurrencyAllTime}", "Resource", "${ProvisionedConcurrencyAllTime}:${Alias}",
+          { "stat": "Minimum" } ], [ "...", { "stat": "Average" } ], [ "...", { "stat":
+          "Maximum" } ] ], "region": "eu-west-1", "view": "timeSeries", "stacked":
+          false, "title": "Execution Duration", "liveData": true } }, { "height":
+          9, "width": 12, "y": 6, "x": 12, "type": "metric", "properties": { "metrics":
+          [ [ "AWS/Lambda", "ConcurrentExecutions", "FunctionName", "${ProvisionedConcurrencyAllTime}",
+          "Resource", "${ProvisionedConcurrencyAllTime}:${Alias}", { "label": "ConcurrentExecutions"
+          } ], [ ".", "ProvisionedConcurrentExecutions", ".", "." ], [ ".", "ProvisionedConcurrencySpilloverInvocations",
+          ".", "." ] ], "period": 1, "region": "eu-west-1", "title": "Concurrent executions",
+          "view": "timeSeries", "stacked": false, "liveData": true, "stat": "Maximum"
+          } }, { "height": 9, "width": 12, "y": 6, "x": 0, "type": "metric", "properties":
+          { "period": 1, "metrics": [ [ "AWS/Lambda", "ProvisionedConcurrencyUtilization",
+          "FunctionName", "${ProvisionedConcurrencyAllTime}", "Resource", "${ProvisionedConcurrencyAllTime}:${Alias}",
+          { "stat": "Maximum" } ] ], "region": "eu-west-1", "yAxis": { "left": { "max":
+          1 } }, "view": "timeSeries", "stacked": false, "title": "ProvisionedConcurrencyUtilization",
+          "liveData": true } }, { "height": 3, "width": 15, "y": 0, "x": 0, "type":
+          "metric", "properties": { "metrics": [ [ "WhatsNew-LambdaPC", "Latency",
+          "CATEGORY", "performance", "TEST_NAME", "${ProvisionedConcurrencyAllTime}",
+          "TYPE", "latency", { "label": "Latency - Max", "stat": "Maximum" } ], [
+          "...", { "label": "Latency - P99", "stat": "p99" } ], [ "...", { "label":
+          "Latency - Avg" } ], [ "...", { "label": "Samples", "stat": "SampleCount"
+          } ] ], "view": "singleValue", "stacked": true, "region": "eu-west-1", "start":
+          "-PT1H", "end": "P0D", "stat": "Average", "period": 1, "setPeriodToTimeRange":
+          true, "title": "Artillery Data" } }, { "height": 3, "width": 15, "y": 3,
+          "x": 0, "type": "metric", "properties": { "metrics": [ [ "AWS/Lambda", "ProvisionedConcurrentExecutions",
+          "FunctionName", "${ProvisionedConcurrencyAllTime}" ], [ ".", "ProvisionedConcurrencySpilloverInvocations",
+          ".", "." ], [ ".", "ProvisionedConcurrencyInvocations", ".", ".", { "visible":
+          false, "stat": "Sum" } ] ], "view": "singleValue", "region": "eu-west-1",
+          "stat": "Maximum", "period": 5, "title": "PC Utilization" } } ]}
+
+          '
+  ProvisionedConcurrencyScheduled:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: A Lambda function that logs the payload of messages sent to an
+        associated SQS queue.
+      Runtime: nodejs12.x
+      Handler: src/handlers/provisioned-concurrency-scheduled.scheduledEventLoggerHandler
+      AutoPublishAlias: live
+      DeploymentPreference:
+        Type: AllAtOnce
+      ProvisionedConcurrencyConfig:
+        ProvisionedConcurrentExecutions: 20
+      Events:
+        CloudWatchEvent:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 * * * ? *)
+      MemorySize: 128
+      Timeout: 500
+      CodeUri: ProvisionedConcurrencyScheduled
+  PCScheduledDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName:
+        Fn::Sub: PCScheduled-${AWS::StackName}
+      DashboardBody:
+        Fn::Sub: '{ "widgets": [ { "height": 6, "width": 9, "y": 0, "x": 15, "type":
+          "metric", "properties": { "period": 1, "metrics": [ [ "AWS/Lambda", "Duration",
+          "FunctionName", "${ProvisionedConcurrencyScheduled}", "Resource", "${ProvisionedConcurrencyScheduled}:${Alias}",
+          { "stat": "Minimum" } ], [ "...", { "stat": "Average" } ], [ "...", { "stat":
+          "Maximum" } ] ], "region": "eu-west-1", "view": "timeSeries", "stacked":
+          false, "title": "Execution Duration", "liveData": true } }, { "height":
+          9, "width": 12, "y": 6, "x": 12, "type": "metric", "properties": { "metrics":
+          [ [ "AWS/Lambda", "ConcurrentExecutions", "FunctionName", "${ProvisionedConcurrencyScheduled}",
+          "Resource", "${ProvisionedConcurrencyScheduled}:${Alias}", { "label": "ConcurrentExecutions"
+          } ], [ ".", "ProvisionedConcurrentExecutions", ".", "." ], [ ".", "ProvisionedConcurrencySpilloverInvocations",
+          ".", "." ] ], "period": 1, "region": "eu-west-1", "title": "Concurrent executions",
+          "view": "timeSeries", "stacked": false, "liveData": true, "stat": "Maximum"
+          } }, { "height": 9, "width": 12, "y": 6, "x": 0, "type": "metric", "properties":
+          { "period": 1, "metrics": [ [ "AWS/Lambda", "ProvisionedConcurrencyUtilization",
+          "FunctionName", "${ProvisionedConcurrencyScheduled}", "Resource", "${ProvisionedConcurrencyScheduled}:${Alias}",
+          { "stat": "Maximum" } ] ], "region": "eu-west-1", "yAxis": { "left": { "max":
+          1 } }, "view": "timeSeries", "stacked": false, "title": "ProvisionedConcurrencyUtilization",
+          "liveData": true } }, { "height": 3, "width": 15, "y": 0, "x": 0, "type":
+          "metric", "properties": { "metrics": [ [ "WhatsNew-LambdaPC", "Latency",
+          "CATEGORY", "performance", "TEST_NAME", "${ProvisionedConcurrencyScheduled}",
+          "TYPE", "latency", { "label": "Latency - Max", "stat": "Maximum" } ], [
+          "...", { "label": "Latency - P99", "stat": "p99" } ], [ "...", { "label":
+          "Latency - Avg" } ], [ "...", { "label": "Samples", "stat": "SampleCount"
+          } ] ], "view": "singleValue", "stacked": true, "region": "eu-west-1", "start":
+          "-PT1H", "end": "P0D", "stat": "Average", "period": 1, "setPeriodToTimeRange":
+          true, "title": "Artillery Data" } }, { "height": 3, "width": 15, "y": 3,
+          "x": 0, "type": "metric", "properties": { "metrics": [ [ "AWS/Lambda", "ProvisionedConcurrentExecutions",
+          "FunctionName", "${ProvisionedConcurrencyScheduled}" ], [ ".", "ProvisionedConcurrencySpilloverInvocations",
+          ".", "." ], [ ".", "ProvisionedConcurrencyInvocations", ".", ".", { "visible":
+          false, "stat": "Sum" } ] ], "view": "singleValue", "region": "eu-west-1",
+          "stat": "Maximum", "period": 5, "title": "PC Utilization" } } ]}
+
+          '
+  ProvisionedConcurrencyScheduledScalingTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    DependsOn: ProvisionedConcurrencyScheduledAliaslive
+    Properties:
+      MaxCapacity: 0
+      MinCapacity: 0
+      ResourceId:
+        Fn::Sub: function:${ProvisionedConcurrencyScheduled}:live
+      RoleARN:
+        Fn::Sub: arn:aws:iam::${AWS::AccountId}:role/aws-service-role/lambda.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_Lambda
+      ScalableDimension: lambda:function:ProvisionedConcurrency
+      ScheduledActions:
+      - ScalableTargetAction:
+          MaxCapacity: 4
+          MinCapacity: 1
+        Schedule: cron(0/1 8-18 ? * MON-FRI *)
+        ScheduledActionName: Working hours schedule scaling
+      - ScalableTargetAction:
+          MaxCapacity: 0
+          MinCapacity: 0
+        Schedule: cron(0/1 0-8,18-23 * * ? *)
+        ScheduledActionName: Off-hours
+      ServiceNamespace: lambda
+  ProvisionedConcurrencyScheduledScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: utilization
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId:
+        Ref: ProvisionedConcurrencyScheduledScalingTarget
+      TargetTrackingScalingPolicyConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: LambdaProvisionedConcurrencyUtilization
+        TargetValue: '0.8'
+  ProvisionedConcurrencyAutoscaled:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: A Lambda function that logs the payload of messages sent to an
+        associated SQS queue.
+      Runtime: nodejs12.x
+      Handler: src/handlers/provisioned-concurrency-autoscaled.scheduledEventLoggerHandler
+      AutoPublishAlias: live
+      DeploymentPreference:
+        Type: AllAtOnce
+      ProvisionedConcurrencyConfig:
+        ProvisionedConcurrentExecutions: 20
+      Events:
+        CloudWatchEvent:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 * * * ? *)
+      MemorySize: 128
+      Timeout: 500
+      CodeUri: ProvisionedConcurrencyAutoscaled
+  PCAutoscaledDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName:
+        Fn::Sub: PCAutoscaled-${AWS::StackName}
+      DashboardBody:
+        Fn::Sub: '{ "widgets": [ { "height": 6, "width": 9, "y": 0, "x": 15, "type":
+          "metric", "properties": { "period": 1, "metrics": [ [ "AWS/Lambda", "Duration",
+          "FunctionName", "${ProvisionedConcurrencyAutoscaled}", "Resource", "${ProvisionedConcurrencyAutoscaled}:${Alias}",
+          { "stat": "Minimum" } ], [ "...", { "stat": "Average" } ], [ "...", { "stat":
+          "Maximum" } ] ], "region": "eu-west-1", "view": "timeSeries", "stacked":
+          false, "title": "Execution Duration", "liveData": true } }, { "height":
+          9, "width": 12, "y": 6, "x": 12, "type": "metric", "properties": { "metrics":
+          [ [ "AWS/Lambda", "ConcurrentExecutions", "FunctionName", "${ProvisionedConcurrencyAutoscaled}",
+          "Resource", "${ProvisionedConcurrencyAutoscaled}:${Alias}", { "label": "ConcurrentExecutions"
+          } ], [ ".", "ProvisionedConcurrentExecutions", ".", "." ], [ ".", "ProvisionedConcurrencySpilloverInvocations",
+          ".", "." ] ], "period": 1, "region": "eu-west-1", "title": "Concurrent executions",
+          "view": "timeSeries", "stacked": false, "liveData": true, "stat": "Maximum"
+          } }, { "height": 9, "width": 12, "y": 6, "x": 0, "type": "metric", "properties":
+          { "period": 1, "metrics": [ [ "AWS/Lambda", "ProvisionedConcurrencyUtilization",
+          "FunctionName", "${ProvisionedConcurrencyAutoscaled}", "Resource", "${ProvisionedConcurrencyAutoscaled}:${Alias}",
+          { "stat": "Maximum" } ] ], "region": "eu-west-1", "yAxis": { "left": { "max":
+          1 } }, "view": "timeSeries", "stacked": false, "title": "ProvisionedConcurrencyUtilization",
+          "liveData": true } }, { "height": 3, "width": 15, "y": 0, "x": 0, "type":
+          "metric", "properties": { "metrics": [ [ "WhatsNew-LambdaPC", "Latency",
+          "CATEGORY", "performance", "TEST_NAME", "${ProvisionedConcurrencyAutoscaled}",
+          "TYPE", "latency", { "label": "Latency - Max", "stat": "Maximum" } ], [
+          "...", { "label": "Latency - P99", "stat": "p99" } ], [ "...", { "label":
+          "Latency - Avg" } ], [ "...", { "label": "Samples", "stat": "SampleCount"
+          } ] ], "view": "singleValue", "stacked": true, "region": "eu-west-1", "start":
+          "-PT1H", "end": "P0D", "stat": "Average", "period": 1, "setPeriodToTimeRange":
+          true, "title": "Artillery Data" } }, { "height": 3, "width": 15, "y": 3,
+          "x": 0, "type": "metric", "properties": { "metrics": [ [ "AWS/Lambda", "ProvisionedConcurrentExecutions",
+          "FunctionName", "${ProvisionedConcurrencyAutoscaled}" ], [ ".", "ProvisionedConcurrencySpilloverInvocations",
+          ".", "." ], [ ".", "ProvisionedConcurrencyInvocations", ".", ".", { "visible":
+          false, "stat": "Sum" } ] ], "view": "singleValue", "region": "eu-west-1",
+          "stat": "Maximum", "period": 5, "title": "PC Utilization" } } ]}
+
+          '
+  ProvisionedConcurrencyAutoscaledTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      MaxCapacity: 100
+      MinCapacity: 1
+      ResourceId:
+        Fn::Sub: function:${ProvisionedConcurrencyAutoscaled}:live
+      RoleARN:
+        Fn::Sub: arn:aws:iam::${AWS::AccountId}:role/aws-service-role/lambda.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_LambdaConcurrency
+      ScalableDimension: lambda:function:ProvisionedConcurrency
+      ServiceNamespace: lambda
+    DependsOn: ProvisionedConcurrencyAutoscaledAliaslive
+  ProvisionedConcurrencyAutoscaledPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: utilization
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId:
+        Ref: ProvisionedConcurrencyAutoscaledTarget
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: 0.7
+        PredefinedMetricSpecification:
+          PredefinedMetricType: LambdaProvisionedConcurrencyUtilization
