@@ -18,6 +18,7 @@ Resources:
       Description: A Lambda function that logs the payload of messages sent to an associated SQS queue.
       Runtime: nodejs12.x
       Handler: src/handlers/provisioned-concurrency-none.scheduledEventLoggerHandler
+      # ReservedConcurrentExecutions: 900
       Events:
         CloudWatchEvent:
           Type: Schedule
